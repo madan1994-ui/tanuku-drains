@@ -24,58 +24,65 @@ cloudinary.config(
 )
 
 def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL)
+    # Force SSL mode for Render PostgreSQL
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     return conn
-
 def init_db():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    # Users table
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(50) UNIQUE NOT NULL,
-            password_hash VARCHAR(255) NOT NULL,
-            role VARCHAR(20) DEFAULT 'user',
-            ward VARCHAR(10)
-        )
-    ''')
-    
-    # Drains table - added work_type and work_date for larva spraying
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS drains (
-            id SERIAL PRIMARY KEY,
-            drain_id VARCHAR(50),
-            ward VARCHAR(10) NOT NULL,
-            location TEXT,
-            status VARCHAR(50) DEFAULT 'Pending',
-            photo_url TEXT,
-            work_type VARCHAR(100),
-            work_date DATE,
-            updated_by VARCHAR(50),
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Add default users - added ward29
-    users = [
-        ('admin', generate_password_hash('Tanuku@2026'), 'admin', None),
-        ('ward11', generate_password_hash('Ward11@2026'), 'user', '11'),
-        ('ward12', generate_password_hash('Ward12@2026'), 'user', '12'),
-        ('ward29', generate_password_hash('Ward29@2026'), 'user', '29')
-    ]
-    
-    for username, password_hash, role, ward in users:
-        cur.execute("""
-            INSERT INTO users (username, password_hash, role, ward) 
-            VALUES (%s, %s, %s, %s) 
-            ON CONFLICT (username) DO NOTHING
-        """, (username, password_hash, role, ward))
-    
-    conn.commit()
-    cur.close()
-    conn.close()
+    """Create tables and default users if they don't exist"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Users table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                role VARCHAR(20) DEFAULT 'user',
+                ward VARCHAR(10)
+            )
+        ''')
+        
+        # Drains table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS drains (
+                id SERIAL PRIMARY KEY,
+                drain_id VARCHAR(50),
+                ward VARCHAR(10) NOT NULL,
+                location TEXT,
+                status VARCHAR(50) DEFAULT 'Pending',
+                photo_url TEXT,
+                work_type VARCHAR(100),
+                work_date DATE,
+                updated_by VARCHAR(50),
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Add default users - added ward29
+        users = [
+            ('admin', generate_password_hash('Tanuku@2026'), 'admin', None),
+            ('ward11', generate_password_hash('Ward11@2026'), 'user', '11'),
+            ('ward12', generate_password_hash('Ward12@2026'), 'user', '12'),
+            ('ward29', generate_password_hash('Ward29@2026'), 'user', '29')
+        ]
+        
+        for username, password_hash, role, ward in users:
+            cur.execute("""
+                INSERT INTO users (username, password_hash, role, ward) 
+                VALUES (%s, %s, %s, %s) 
+                ON CONFLICT (username) DO NOTHING
+            """, (username, password_hash, role, ward))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("Database initialized successfully")
+    except Exception as e:
+        print(f"Database init error: {e}")
+        # Don't crash the app if DB is temporarily unavailable
+        pass
 
 init_db()
 
