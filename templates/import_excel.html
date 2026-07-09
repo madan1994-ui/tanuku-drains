@@ -1,25 +1,288 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Import Excel - Tanuku Drains</title>
-</head>
-<body>
-    <h2>Import Drains from Excel</h2>
+import os
+import io
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from flask import Flask, render_template, request, redirect, session, flash, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+import openpyxl
+import cloudinary.uploader
 
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <p style="color: red;">{{ message }}</p>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'tanuku-drains-2026-secret')
 
-    <form method="POST" enctype="multipart/form-data">
-        <label>Select.xlsx file:</label><br>
-        <input type="file" name="file" accept=".xlsx" required><br><br>
-        <input type="submit" value="Upload">
-    </form>
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
-    <br><a href="/dashboard">Back to Dashboard</a>
-</body>
-</html>
+cloudinary.config(
+    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key = os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret = os.environ.get('CLOUDINARY_API_SECRET')
+)
+
+def get_db_connection():
+    if not DATABASE_URL:
+        raise Exception("DATABASE_URL not set")
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
+
+def init_db():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                role VARCHAR(20) DEFAULT 'user',
+                ward VARCHAR(10)
+            )
+        ''')
+
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS drains (
+                id SERIAL PRIMARY KEY,
+                drain_id VARCHAR(50),
+                ward VARCHAR(10) NOT NULL,
+                location TEXT,
+                status VARCHAR(50) DEFAULT 'Pending',
+                photo_url TEXT,
+                work_type VARCHAR(100),
+                work_date DATE,
+                updated_by VARCHAR(50),
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        cur.execute("""
+            INSERT INTO users (username, password_hash, role, ward)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (username) DO NOTHING
+        """, ('admin', generate_password_hash('Tanuku@2026'), 'admin', None))
+
+        ward_users = [
+            ('ward11', 'Ward11@2026', '11'),
+            ('ward12', 'Ward12@2026', '12'),
+            ('ward29', 'Ward29@2026', '29')
+        ]
+
+        for username, password, ward in ward_users:
+            cur.execute("""
+                INSERT INTO users (username, password_hash, role, ward)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (username) DO NOTHING
+            """, (username, generate_password_hash(password), 'user', ward))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("Database initialized successfully")
+    except Exception as e:
+        print(f"Database init error: {e}")
+
+try:
+    init_db()
+except Exception as e:
+    print(f"Database init error: {e}")
+
+@app.route('/')
+def index():
+    if 'username' in session:
+        return redirect('/dashboard')
+    return redirect('/login')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if user and check_password_hash(user['password_hash'], password):
+            session['username'] = user['username']
+            session['role'] = user['role']
+            session['ward'] = user['ward']
+            return redirect('/dashboard')
+        else:
+            return render_template('login.html', error='Invalid username or password')
+
+    return render_template('login.html')
+
+@app.route('/dashboard')
+def dashboard():
+    if 'username' not in session:
+        return redirect('/login')
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    if session.get('role') == 'admin':
+        cur.execute("SELECT * FROM drains ORDER BY ward, drain_id")
+    else:
+        cur.execute("SELECT * FROM drains WHERE ward = %s ORDER BY drain_id", (session.get('ward'),))
+
+    drains = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return render_template('dashboard.html', drains=drains)
+
+@app.route('/upload_work/<int:drain_id>', methods=['GET', 'POST'])
+def upload_work(drain_id):
+    if 'username' not in session:
+        return redirect('/login')
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    cur.execute("SELECT * FROM drains WHERE id = %s", (drain_id,))
+    drain = cur.fetchone()
+
+    if session.get('role')!= 'admin' and drain['ward']!= session.get('ward'):
+        flash('You do not have access to this drain')
+        cur.close()
+        conn.close()
+        return redirect('/dashboard')
+
+    if request.method == 'POST':
+        work_type = request.form.get('work_type')
+        status = request.form.get('status')
+        photo_url = drain['photo_url']
+
+        if 'photo' in request.files:
+            photo = request.files['photo']
+            if photo.filename!= '':
+                try:
+                    upload_result = cloudinary.uploader.upload(photo, folder="tanuku_drains")
+                    photo_url = upload_result['secure_url']
+                except Exception as e:
+                    flash(f'Photo upload failed: {str(e)}')
+                    cur.close()
+                    conn.close()
+                    return redirect(url_for('upload_work', drain_id=drain_id))
+
+        cur.execute("""
+            UPDATE drains
+            SET status = %s, photo_url = %s, work_type = %s, work_date = CURRENT_DATE,
+                updated_by = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (status, photo_url, work_type, session['username'], drain_id))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        flash('Work updated successfully')
+        return redirect('/dashboard')
+
+    cur.close()
+    conn.close()
+    return render_template('upload_work.html', drain=drain)
+
+@app.route('/import_excel', methods=['GET', 'POST'])
+def import_excel():
+    if 'username' not in session or session.get('role')!= 'admin':
+        return redirect('/login')
+
+    if request.method == 'POST':
+        file = request.files['file']
+        if file and file.filename.endswith('.xlsx'):
+            try:
+                wb = openpyxl.load_workbook(file)
+                sheet = wb.active
+
+                conn = get_db_connection()
+                cur = conn.cursor()
+
+                cur.execute("DELETE FROM drains")
+
+                wards = set()
+                count = 0
+                for row in sheet.iter_rows(min_row=2, values_only=True):
+                    drain_id = str(row[2]) if row[2] else ''
+                    ward = str(row[1]) if row[1] else ''
+                    location = str(row[3]) if row[3] else ''
+
+                    if drain_id and ward:
+                        cur.execute("""
+                            INSERT INTO drains (drain_id, ward, location, status)
+                            VALUES (%s, %s, %s, %s)
+                        """, (drain_id, ward, location, 'Pending'))
+                        wards.add(ward)
+                        count += 1
+
+                for ward in wards:
+                    username = f'ward{ward}'
+                    password = f'Ward{ward}@2026'
+                    cur.execute("""
+                        INSERT INTO users (username, password_hash, role, ward)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (username) DO NOTHING
+                    """, (username, generate_password_hash(password), 'user', ward))
+
+                conn.commit()
+                cur.close()
+                conn.close()
+                flash(f'Successfully imported {count} drains. Ward logins created: {", ".join([f"ward{w}" for w in wards])}')
+                return redirect('/dashboard')
+            except Exception as e:
+                flash(f'Error importing Excel: {str(e)}')
+                return redirect('/import_excel')
+
+    return render_template('import_excel.html')
+
+@app.route('/photo_report')
+def photo_report():
+    if 'username' not in session:
+        return redirect('/login')
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    if session.get('role') == 'admin':
+        cur.execute("""
+            SELECT * FROM drains
+            WHERE photo_url IS NOT NULL AND photo_url!= ''
+            ORDER BY ward, work_date DESC
+        """)
+    else:
+        cur.execute("""
+            SELECT * FROM drains
+            WHERE ward = %s AND photo_url IS NOT NULL AND photo_url!= ''
+            ORDER BY work_date DESC
+        """, (session.get('ward'),))
+
+    drains = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return render_template('photo_report.html', drains=drains)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
+
+# TEMP ROUTE TO FIX DATABASE - DELETE AFTER USING
+@app.route('/fix_db_temp_12345')
+def fix_db_temp():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('DROP TABLE IF EXISTS users CASCADE; DROP TABLE IF EXISTS drains CASCADE;')
+        conn.commit()
+        cur.close()
+        conn.close()
+        init_db()
+        return "SUCCESS: Old tables dropped. New tables created. Now delete this route from app.py and redeploy."
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
+if __name__ == '__main__':
+    app.run(debug=False)
