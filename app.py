@@ -269,6 +269,19 @@ def photo_report():
 def logout():
     session.clear()
     return redirect('/login')
+@app.route('/fix_db_temp_12345')
+def fix_db_temp():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('DROP TABLE IF EXISTS users CASCADE; DROP TABLE IF EXISTS drains CASCADE;')
+        conn.commit()
+        cur.close()
+        conn.close()
+        init_db()  # This recreates tables with correct columns
+        return "SUCCESS: Old tables dropped. New tables created. Now delete this route from app.py and redeploy."
+    except Exception as e:
+        return f"ERROR: {str(e)}"
 
 if __name__ == '__main__':
     app.run(debug=False)
