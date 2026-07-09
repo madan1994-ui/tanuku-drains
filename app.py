@@ -21,7 +21,9 @@ cloudinary.config(
 )
 
 def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    if not DATABASE_URL:
+        raise Exception("DATABASE_URL not set")
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
 def init_db():
