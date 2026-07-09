@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login - Tanuku Drain Master</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: Arial; max-width: 400px; margin: 100px auto;">
+    <h2>Tanuku Drain Master</h2>
+    {% if error %}<p style="color:red">{{ error }}</p>{% endif %}
+    <form method="POST">
+        <input name="username" placeholder="Username" required style="width:100%; padding:10px; margin:8px 0;"><br>
+        <input type="password" name="password" placeholder="Password" required style="width:100%; padding:10px; margin:8px 0;"><br>
+        <button type="submit" style="width:100%; padding:12px; background:#007bff; color:white; border:none;">Login</button>
+    </form>
+</body>
+</html>
