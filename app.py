@@ -24,16 +24,13 @@ cloudinary.config(
 )
 
 def get_db_connection():
-    # Force SSL mode for Render PostgreSQL
     conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     return conn
 def init_db():
-    """Create tables and default users if they don't exist"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Users table
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -44,7 +41,6 @@ def init_db():
             )
         ''')
         
-        # Drains table
         cur.execute('''
             CREATE TABLE IF NOT EXISTS drains (
                 id SERIAL PRIMARY KEY,
@@ -60,7 +56,7 @@ def init_db():
             )
         ''')
         
-        # Add default users - added ward29
+        # Add default users
         users = [
             ('admin', generate_password_hash('Tanuku@2026'), 'admin', None),
             ('ward11', generate_password_hash('Ward11@2026'), 'user', '11'),
@@ -81,8 +77,7 @@ def init_db():
         print("Database initialized successfully")
     except Exception as e:
         print(f"Database init error: {e}")
-        # Don't crash the app if DB is temporarily unavailable
-        pass
+        pass  # Don't crash the app if DB is temporarily down
 
 init_db()
 
