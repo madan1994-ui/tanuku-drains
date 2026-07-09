@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard - Tanuku Drains</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial; margin: 0; padding: 20px; background: #f8f9fa; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h2 { margin: 0; color: #333; }
+        .nav { display: flex; gap: 10px; }
+        .btn { padding: 8px 16px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 14px; }
+        .btn-green { background: #28a745; }
+        .btn-red { background: #dc3545; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th, td { border-bottom: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        th { background: #007bff; color: white; }
+        tr:hover { background: #f8f9fa; }
+        .flash { padding: 10px; margin: 10px 0; border-radius: 4px; background: #d4edda; color: #155724; }
+        .status-pending { color: #ffc107; font-weight: bold; }
+        .status-completed { color: #28a745; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Drain Dashboard - Ward: {{ session.ward if session.ward else 'All' }}</h2>
+        <div class="nav">
+            {% if session.role == 'admin' %}<a href="/import_excel" class="btn btn-green">Import Excel</a>{% endif %}
+            <a href="/photo_report" class="btn">Photo Report</a>
+            <a href="/logout" class="btn btn-red">Logout ({{ session.username }})</a>
+        </div>
+    </div>
+    
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <table>
+        <tr>
+            <th>Drain ID</th><th>Ward</th><th>Location</th><th>Status</th><th>Work Type</th><th>Work Date</th><th>Photo</th><th>Action</th>
+        </tr>
+        {% for drain in drains %}
+        <tr>
+            <td>{{ drain.drain_id }}</td>
+            <td>{{ drain.ward }}</td>
+            <td>{{ drain.location }}</td>
+            <td class="status-{{ drain.status|lower }}">{{ drain.status }}</td>
+            <td>{{ drain.work_type or '-' }}</td>
+            <td>{{ drain.work_date.strftime('%d-%m-%Y') if drain.work_date else '-' }}</td>
+            <td>
+                {% if drain.photo_url %}
+                <a href="{{ drain.photo_url }}" target="_blank">View Photo</a>
+                {% else %}No Photo{% endif %}
+            </td>
+            <td><a href="/upload_work/{{ drain.id }}" class="btn">Update Work</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% if not drains %}<p style="text-align:center; margin-top:40px;">No drains found. Import Excel to add data.</p>{% endif %}
+</body>
+</html>
