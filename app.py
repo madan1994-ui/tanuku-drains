@@ -26,8 +26,12 @@ def get_db_connection():
     conn = psycopg2.connect(DATABASE_URL)
     return conn
 
-def init_db():
-    try:
+# Replace init_db() call at bottom with this:
+try:
+    init_db()
+except Exception as e:
+    print(f"Database init error: {e}")
+    # App still starts, DB creates on first request
         conn = get_db_connection()
         cur = conn.cursor()
         
