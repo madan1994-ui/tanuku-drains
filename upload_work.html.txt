@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Update Work - Tanuku Drains</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial; background: #f0f2f5; margin: 0; padding: 20px; }
+        .form-box { max-width: 500px; margin: 40px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { color: #333; margin-bottom: 20px; }
+        label { display: block; margin: 15px 0 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
+        button { width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 20px; }
+        .info { background: #e9ecef; padding: 10px; border-radius: 4px; margin-bottom: 20px; }
+        .back { display: inline-block; margin-bottom: 20px; color: #007bff; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="form-box">
+        <a href="/dashboard" class="back">← Back to Dashboard</a>
+        <h2>Update Work Status</h2>
+        <div class="info">
+            <strong>Drain ID:</strong> {{ drain.drain_id }}<br>
+            <strong>Ward:</strong> {{ drain.ward }}<br>
+            <strong>Location:</strong> {{ drain.location }}
+        </div>
+        <form method="POST" enctype="multipart/form-data">
+            <label>Work Type:</label>
+            <select name="work_type" required>
+                <option value="">Select Work Type</option>
+                <option value="Larva Spraying">Larva Spraying</option>
+                <option value="Desilting">Desilting</option>
+                <option value="Slab Cleaning">Slab Cleaning</option>
+                <option value="Repair Work">Repair Work</option>
+            </select>
+            
+            <label>Work Date:</label>
+            <input type="date" name="work_date" value="{{ today }}" required>
+            
+            <label>Upload Photo:</label>
+            <input type="file" name="photo" accept="image/*" required>
+            
+            <label>Update Status:</label>
+            <select name="status" required>
+                <option value="Completed">Completed</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Pending">Pending</option>
+            </select>
+            
+            <button type="submit">Submit Work Update</button>
+        </form>
+    </div>
+</body>
+</html>

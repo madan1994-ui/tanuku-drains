@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Import Excel - Tanuku Drains</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial; background: #f0f2f5; margin: 0; padding: 20px; }
+        .form-box { max-width: 600px; margin: 40px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { color: #333; margin-bottom: 20px; }
+        input[type="file"] { width: 100%; padding: 10px; margin: 15px 0; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        .back { display: inline-block; margin-bottom: 20px; color: #007bff; text-decoration: none; }
+        .info { background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #ffc107; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="form-box">
+        <a href="/dashboard" class="back">← Back to Dashboard</a>
+        <h2>Import Drains from Excel</h2>
+        
+        <div class="info">
+            <strong>Excel Format Required:</strong>
+            <table>
+                <tr><th>drain_id</th><th>ward</th><th>location</th></tr>
+                <tr><td>WD29-001</td><td>29</td><td>Gandhi Nagar Main Road</td></tr>
+                <tr><td>WD29-002</td><td>29</td><td>RTC Complex Backside</td></tr>
+            </table>
+            <p>Column names must be exactly: <code>drain_id</code>, <code>ward</code>, <code>location</code></p>
+        </div>
+        
+        <form method="POST" enctype="multipart/form-data">
+            <label>Select Excel File (.xlsx):</label>
+            <input type="file" name="excel_file" accept=".xlsx" required>
+            <button type="submit">Import Drains</button>
+        </form>
+    </div>
+</body>
+</html>
